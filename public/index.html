@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Student Hub</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:Arial;background:#f0f2f5}
+        .header{background:#4CAF50;color:white;padding:15px;text-align:center}
+        .tabs{display:flex;background:white;padding:10px}
+        .tab{flex:1;text-align:center;padding:10px;background:#ddd;margin:0 5px;border-radius:5px;cursor:pointer}
+        .tab.active{background:#4CAF50;color:white}
+        .container{padding:15px}
+        .card{background:white;padding:15px;margin-bottom:10px;border-radius:8px}
+        .subject{display:inline-block;background:#e3f2fd;padding:3px 10px;border-radius:15px;font-size:12px;margin:5px 0}
+        .btn{background:#4CAF50;color:white;border:none;padding:10px;border-radius:5px;cursor:pointer;width:100%;margin-top:10px}
+        .delete{background:#f44336}
+        .completed{opacity:0.6}
+        input,select,textarea{width:100%;padding:10px;margin:5px 0;border:1px solid #ddd;border-radius:5px}
+        .form-box{background:white;padding:15px;border-radius:8px;margin:10px 0}
+    </style>
+</head>
+<body>
+    <div class="header"><h1>📚 Student Hub</h1></div>
+    <div class="tabs">
+        <div class="tab active" id="tab-notes">📝 Notes</div>
+        <div class="tab" id="tab-homework">📚 Homework</div>
+        <div class="tab" id="tab-plans">📅 Planner</div>
+    </div>
+    <div class="container" id="content"></div>
+
+    <script>
+        let currentTab = 'notes';
+        
+        document.getElementById('tab-notes').onclick = () => showTab('notes');
+        document.getElementById('tab-homework').onclick = () => showTab('homework');
+        document.getElementById('tab-plans').onclick = () => showTab('plans');
+
+        async function fetchData(tab) {
+            try {
+                const res = await fetch('/api/' + tab);
+                return await res.json();
+            } catch(e) {
+                return [];
+            }
+        }
+
+        async function deleteItem(id) {
+            if(!confirm('Delete?')) return;
+            await fetch('/api/' + currentTab + '/' + id, { method: 'DELETE' });
+            showTab(currentTab);
+        }
+
+        async function toggleHomework(id, checked) {
+            await fetch('/api/homework/' + id, {
+                method: 'PATCH',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({completed: checked})
+            });
+            showTab('homework');
+        }
+
+        function showTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById('tab-' + tab).classList.add('active');
+            renderTab();
+        }
+
+        function showForm() {
+            const formDiv = document.getElementById('addForm');
+            let html = '';
+            if(currentTab === 'notes') {
+                html = `<h3>Add Note</h3>
+                    <input id="title" placeholder="Title">
+                    <select id="subject"><option>Physics</option><option>Chemistry</option><option>Math</option></select>
+                    <textarea id="desc" placeholder="Description"></textarea>
+                    <input id="by" placeholder="Your Name" value="Me">
+                    <button class="btn" id="saveBtn">Save Note</button>
+                    <button class="btn delete" id="cancelBtn">Cancel</button>`;
+            } else if(currentTab === 'homework') {
+                html = `<h3>Add Homework</h3>
+                    <input id="title" placeholder="Title">
+                    <select id="subject"><option>Physics</option><option>Chemistry</option><option>Math</option></select>
+                    <input id="deadline" placeholder="Deadline">
+                    <button class="btn" id="saveBtn">Save Homework</button>
+                    <button class="btn delete" id="cancelBtn">Cancel</button>`;
+            } else {
+                html = `<h3>Add Plan</h3>
+                    <input id="event" placeholder="Event">
+                    <input id="date" placeholder="Date">
+                    <input id="time" placeholder="Time">
+                    <button class="btn" id="saveBtn">Save Plan</button>
+                    <button class="btn delete" id="cancelBtn">Cancel</button>`;
+            }
+            formDiv.innerHTML = html;
+            formDiv.style.display = 'block';
+            
+            document.getElementById('cancelBtn').onclick = () => formDiv.style.display = 'none';
+            document.getElementById('saveBtn').onclick = saveItem;
+        }
+
+        async function saveItem() {
+            let data = {};
+            if(currentTab === 'notes') {
+                data = {
+                    title: document.getElementById('title').value,
+                    subject: document.getElementById('subject').value,
+                    description: document.getElementById('desc').value,
+                    uploadedBy: document.getElementById('by').value || 'Anonymous'
+                };
+            } else if(currentTab === 'homework') {
+                data = {
+                    title: document.getElementById('title').value,
+                    subject: document.getElementById('subject').value,
+                    deadline: document.getElementById('deadline').value
+                };
+            } else {
+                data = {
+                    event: document.getElementById('event').value,
+                    date: document.getElementById('date').value,
+                    time: document.getElementById('time').value
+                };
+            }
+            
+            await fetch('/api/' + currentTab, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            showTab(currentTab);
+        }
+
+        async function renderTab() {
+            const container = document.getElementById('content');
+            const items = await fetchData(currentTab);
+            
+            let html = `<button class="btn" onclick="showForm()">➕ Add New</button>
+                        <div id="addForm" class="form-box" style="display:none"></div>`;
+            
+            items.forEach(item => {
+                if(currentTab === 'notes') {
+                    html += `<div class="card">
+                        <h3>${item.title}</h3><span class="subject">${item.subject}</span>
+                        <p>${item.description}</p><small>By: ${item.uploadedBy}</small>
+                        <button class="btn delete" onclick="deleteItem('${item._id}')">Delete</button>
+                    </div>`;
+                } else if(currentTab === 'homework') {
+                    html += `<div class="card ${item.completed ? 'completed' : ''}">
+                        <h3>${item.title}</h3><span class="subject">${item.subject}</span>
+                        <p>Deadline: ${item.deadline}</p>
+                        <label><input type="checkbox" ${item.completed ? 'checked' : ''} 
+                            onchange="toggleHomework('${item._id}', this.checked)"> Done</label>
+                        <button class="btn delete" onclick="deleteItem('${item._id}')">Delete</button>
+                    </div>`;
+                } else {
+                    html += `<div class="card">
+                        <h3>${item.event}</h3>
+                        <p>Date: ${item.date} | Time: ${item.time}</p>
+                        <button class="btn delete" onclick="deleteItem('${item._id}')">Delete</button>
+                    </div>`;
+                }
+            });
+            
+            container.innerHTML = html;
+        }
+
+        renderTab();
+    </script>
+</body>
+</html>
