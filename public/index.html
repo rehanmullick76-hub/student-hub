@@ -138,26 +138,43 @@
     }
 
     async function handleSignup(e) {
-        e.preventDefault();
-        const formData = new FormData();
-        formData.append('name', document.getElementById('signupName').value);
-        formData.append('email', document.getElementById('signupEmail').value);
-        formData.append('password', document.getElementById('signupPassword').value);
-        if(avatarFile) formData.append('avatar', avatarFile);
-        
+    e.preventDefault();
+    
+    const name = document.getElementById('signupName').value;
+    const email = document.getElementById('signupEmail').value;
+    const password = document.getElementById('signupPassword').value;
+    
+    if(!name || !email || !password) {
+        alert('সব ঘর পূরণ করো');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('email', email);
+    formData.append('password', password);
+    
+    try {
         const res = await fetch('/api/auth/register', {
             method: 'POST',
             body: formData
         });
         const data = await res.json();
+        
         if(res.ok) {
             token = data.token;
             user = data.user;
             localStorage.setItem('token', token);
             localStorage.setItem('user', JSON.stringify(user));
+            alert('Sign Up সফল!');
             showApp();
-        } else alert(data.message);
+        } else {
+            alert('এরর: ' + (data.message || 'কিছু সমস্যা হয়েছে'));
+        }
+    } catch(err) {
+        alert('নেটওয়ার্ক এরর: সার্ভার চালু আছে তো?');
     }
+}
 
     async function uploadAvatar(event) {
         const file = event.target.files[0];
